@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int           @id @default(autoincrement())
+  name        String
+  email       String        @unique
+  password    String
+  Document    Document[]
+  QuestionLog QuestionLog[]
+}
+
+model Document {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id])
+  title     String
+  path      String
+  category  String? // kategori, misal "Infeksi", "Gizi", dsb
+  source    String? // sumber info, misal "WHO", "Artikel X"
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  chunks    KnowledgeChunk[]
+
+  @@index([category])
+}
+
+model KnowledgeChunk {
+  id                 Int                  @id @default(autoincrement())
+  document           Document             @relation(fields: [documentId], references: [id])
+  documentId         Int
+  content            String // isi chunk (potongan teks)
+  embedding          Json // embedding array 512 dimensi (USE atau lainnya)
+  order              Int // nomor urut chunk untuk menjaga urutan
+  createdAt          DateTime             @default(now())
+  QuestionChunkUsage QuestionChunkUsage[]
+
+  @@index([documentId])
+}
+
+model QuestionLog {
+  id         Int                  @id @default(autoincrement())
+  userId     Int
+  user       User                 @relation(fields: [userId], references: [id])
+  question   String // pertanyaan user
+  embedding  Json? // embedding pertanyaan (opsional, untuk analisa)
+  answer     String // jawaban yang diberikan LLM
+  createdAt  DateTime             @default(now())
+  usedChunks QuestionChunkUsage[]
+}
+
+model QuestionChunkUsage {
+  id              Int            @id @default(autoincrement())
+  questionLog     QuestionLog    @relation(fields: [questionLogId], references: [id])
+  questionLogId   Int
+  chunk           KnowledgeChunk @relation(fields: [chunkId], references: [id])
+  chunkId         Int
+  similarityScore Float // skor cosine similarity antara pertanyaan dan chunk
+}
